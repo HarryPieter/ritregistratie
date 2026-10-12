@@ -129,7 +129,11 @@ async function syncNow(){
     batch.forEach(e=>{const t=db.trips.find(t=>t.id===e.record.id);if(t)t.syncStatus="gesynchroniseerd";});
     localStorage.setItem(STORE_KEY,JSON.stringify(db));$("syncMessage").textContent=`Gesynchroniseerd: ${batch.length} wijziging(en).`;
     setConnection();renderOverview();if(db.outbox.length)scheduleSync();
-  }catch(err){$("syncMessage").textContent="Synchronisatie niet bevestigd. De gegevens blijven veilig in de wachtrij. Controleer URL, toegangscode en publicatie-instellingen.";setConnection();}
+}catch(err){
+  console.error("Synchronisatiefout:", err);
+  $("syncMessage").textContent =
+    "Synchronisatiefout: " + String(err.message || err);
+  setConnection();
 }
 window.addEventListener("online",()=>{setConnection();syncNow();});window.addEventListener("offline",setConnection);
 if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));}
