@@ -66,7 +66,10 @@ function renderStops(){
   if(!trip){list.className="empty";list.textContent="Start eerst een dienst om stops toe te voegen.";return;}
   list.className="";
   if(!trip.stops.length){list.innerHTML='<div class="empty">Nog geen stops. Druk op + Stop.</div>';return;}
-  trip.stops.forEach((stop,index)=>{
+  // Toon alleen de nieuwste stop. Eerdere stops blijven bewaard in de dienst.
+  const visibleStops = trip.stops.length ? [trip.stops[trip.stops.length - 1]] : [];
+  visibleStops.forEach((stop)=>{
+    const index = trip.stops.findIndex(s => s.id === stop.id);
     const node=$("stopTemplate").content.firstElementChild.cloneNode(true);node.dataset.stopId=stop.id;node.querySelector(".stopTitle").textContent=`Stop ${index+1}`;
     node.querySelectorAll("[data-field]").forEach(inp=>{const k=inp.dataset.field;if(k==="aankomst")inp.value=nlTime(stop.aankomstAt);else if(k==="vertrek")inp.value=nlTime(stop.vertrekAt);else inp.value=stop[k]??"";});
     node.querySelector(".markArrival").disabled=!!stop.aankomstAt;node.querySelector(".markDeparture").disabled=!stop.aankomstAt||!!stop.vertrekAt;
