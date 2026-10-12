@@ -9,7 +9,7 @@ let db = loadDb();
 let settings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{"endpoint":"","token":""}');
 let activeTripId = db.activeTripId || null;
 
-function loadDb(){ try{return JSON.parse(localStorage.getItem(STORE_KEY)) || {trips:[],outbox:[],activeTripId:null};}catch(e){return {trips:[],outbox:[],activeTripId:null};} }
+function loadDb(){ try{const d=JSON.parse(localStorage.getItem(STORE_KEY)) || {trips:[],outbox:[],activeTripId:null}; d.trips=d.trips||[]; d.outbox=d.outbox||[]; d.tankbeurten=d.tankbeurten||[]; return d;}catch(e){return {trips:[],outbox:[],activeTripId:null};} }
 function saveDb(){ db.activeTripId=activeTripId; localStorage.setItem(STORE_KEY,JSON.stringify(db)); renderAll(); }
 function activeTrip(){ return db.trips.find(t=>t.id===activeTripId && !t.endedAt) || null; }
 function queue(type, record){ db.outbox.push({eventId:uuid(),type,record,queuedAt:nowIso()}); }
@@ -23,14 +23,43 @@ function startTrip(){
   if(activeTrip()){alert("Er is al een actieve dienst.");return;}
   const chauffeur=$("chauffeur").value.trim();
   if(!chauffeur){alert("Vul eerst de naam van de chauffeur in.");$("chauffeur").focus();return;}
-  const trip={id:uuid(),chauffeur,opdrachtgever:$("opdrachtgever").value.trim(),kenteken:$("kenteken").value.trim(),oplegger:$("oplegger").value.trim(),datum:$("dienstDatum").value || new Date().toISOString().slice(0,10),kmStart:$("kmStart").value,startedAt:nowIso(),endedAt:null,kmEind:"",stops:[],createdAt:nowIso(),updatedAt:nowIso(),syncStatus:"pending"};
+
+  // Vraag de actuele beginstand en vergelijk die met de eindstand van de vorige dienst.
+  const vorigeDienst=db.trips.slice().reverse().find(t=>t.endedAt && String(t.kmEind).trim()!=="");
+  const vorigeStand=vorigeDienst ? Number(String(vorigeDienst.kmEind).replace(",",".")) : null;
+  const kmStart=prompt("Kilometerstand bij start van de dienst:", vorigeDienst ? String(vorigeDienst.kmEind) : $("kmStart").value);
+  if(kmStart===null)return;
+  const startWaarde=Number(String(kmStart).trim().replace(",","."));
+  if(String(kmStart).trim()==="" || !Number.isFinite(startWaarde) || startWaarde<0){alert("Vul een geldige kilometerstand in.");return;}
+
+  let redenKmAfwijking="";
+  if(vorigeDienst && Number.isFinite(vorigeStand) && startWaarde!==vorigeStand){
+    redenKmAfwijking=prompt(`De beginstand (${startWaarde}) wijkt af van de eindstand van de vorige dienst (${vorigeStand}). Wat is de reden?`,"");
+    if(redenKmAfwijking===null)return;
+    if(!redenKmAfwijking.trim()){alert("Vul de reden van de afwijkende kilometerstand in.");return;}
+  }
+
+  $("kmStart").value=String(kmStart).trim();
+  const trip={id:uuid(),chauffeur,opdrachtgever:$("opdrachtgever").value.trim(),kenteken:$("kenteken").value.trim(),oplegger:$("oplegger").value.trim(),datum:$("dienstDatum").value || new Date().toISOString().slice(0,10),kmStart:String(kmStart).trim(),kmStartReden:redenKmAfwijking,startedAt:nowIso(),endedAt:null,kmEind:"",rustUren:"",stops:[],createdAt:nowIso(),updatedAt:nowIso(),syncStatus:"pending"};
   db.trips.push(trip); activeTripId=trip.id; queue("upsert",JSON.parse(JSON.stringify(trip))); saveDb(); scheduleSync();
 }
 function endTrip(){
   const trip=activeTrip(); if(!trip)return;
   if(!confirm("Dienst beëindigen? Controleer eerst de stops en kilometerstand."))return;
   const km=prompt("Kilometerstand einde:",trip.kmEind||""); if(km===null)return;
-  trip.kmEind=km; trip.endedAt=nowIso(); trip.syncStatus="pending";
+  const kmNum=Number(String(km).trim().replace(",","."));
+  if(String(km).trim()==="" || !Number.isFinite(kmNum) || kmNum<0){alert("Vul een geldige kilometerstand in.");return;}
+  if(kmNum<Number(String(trip.kmStart).trim().replace(",","."))){
+    const reden=prompt("De eindstand is lager dan de beginstand. Wat is de reden?");
+    if(reden===null)return;
+    if(!reden.trim()){alert("Vul de reden van deze afwijking in.");return;}
+    trip.kmEindReden=reden.trim();
+  }
+  const rust=prompt("Hoeveel uur rust heb je gehad? Gebruik bijvoorbeeld 1,5 of 0,5.",trip.rustUren||"0");
+  if(rust===null)return;
+  const rustNum=Number(String(rust).trim().replace(",","."));
+  if(String(rust).trim()==="" || !Number.isFinite(rustNum) || rustNum<0){alert("Vul een geldig aantal uren rust in, bijvoorbeeld 1,5.");return;}
+  trip.kmEind=String(km).trim(); trip.rustUren=rustNum; trip.endedAt=nowIso(); trip.syncStatus="pending";
   queue("upsert",JSON.parse(JSON.stringify(trip))); activeTripId=null; saveDb(); scheduleSync();
 }
 function addStop(){
@@ -90,14 +119,62 @@ function renderStops(){
     list.appendChild(node);
   });
 }
+
+
+function saveTank(){
+  const trip=activeTrip();
+  const kenteken=$("tankKentekenKeuze").value==="dienst" ? (trip?.kenteken||"").trim().toUpperCase() : $("tankKenteken").value.trim().toUpperCase();
+  const brandstof=$("tankBrandstof").value;
+  const litersRaw=$("tankLiters").value.trim();
+  const liters=Number(litersRaw.replace(",","."));
+  const km=$("tankKm").value.trim();
+  if(!kenteken){alert("Vul een kenteken in.");$("tankKenteken").focus();return;}
+  if(!litersRaw || !Number.isFinite(liters) || liters<=0){alert("Vul een geldige hoeveelheid liters in.");$("tankLiters").focus();return;}
+  if(km!=="" && (!Number.isFinite(Number(km)) || Number(km)<0)){alert("Vul een geldige kilometerstand in.");return;}
+  const btn=$("saveTank"); btn.disabled=true; $("tankMessage").textContent="GPS-locatie bepalen…";
+  const finish=async (coords)=>{
+    const tank={id:uuid(),kenteken,brandstof,liters,km:km===""?"":Number(km),datumTijd:nowIso(),latitude:coords?.latitude??"",longitude:coords?.longitude??"",nauwkeurigheid:coords?.accuracy??"",straat:"",huisnummer:"",postcode:"",plaats:"",land:"",landcode:"",createdAt:nowIso()};
+    if(coords && navigator.onLine){
+      try{
+        const url=`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(coords.latitude)}&lon=${encodeURIComponent(coords.longitude)}&zoom=18&addressdetails=1`;
+        const res=await fetch(url,{headers:{"Accept":"application/json"}});
+        if(res.ok){
+          const j=await res.json(), a=j.address||{};
+          tank.straat=a.road||a.pedestrian||a.footway||"";
+          tank.huisnummer=a.house_number||"";
+          tank.postcode=a.postcode||"";
+          tank.plaats=a.city||a.town||a.village||a.municipality||a.hamlet||"";
+          tank.land=a.country||"";
+          tank.landcode=(a.country_code||"").toUpperCase();
+          tank.adres=j.display_name||"";
+        }
+      }catch(e){console.warn("Adres opzoeken mislukt",e);}
+    }
+    db.tankbeurten=db.tankbeurten||[]; db.tankbeurten.push(tank);
+    queue("tankbeurt",JSON.parse(JSON.stringify(tank)));
+    saveDb(); scheduleSync();
+    $("tankLiters").value=""; $("tankKm").value="";
+    $("tankMessage").textContent=coords ? "Tankbeurt opgeslagen met GPS-coördinaten." : "Tankbeurt opgeslagen zonder GPS. Controleer locatietoestemming en GPS-bereik.";
+    btn.disabled=false;
+  };
+  if(!navigator.geolocation){finish(null);return;}
+  navigator.geolocation.getCurrentPosition(pos=>finish({latitude:pos.coords.latitude,longitude:pos.coords.longitude,accuracy:pos.coords.accuracy}),err=>{
+    const go=confirm("GPS kon niet worden bepaald. Tankbeurt toch opslaan zonder locatie?");
+    if(go)finish(null);else {btn.disabled=false;$("tankMessage").textContent="Niet opgeslagen. Probeer opnieuw wanneer GPS beschikbaar is.";}
+  },{enableHighAccuracy:true,timeout:15000,maximumAge:0});
+}
+
 function renderAll(){
   const t=activeTrip();
+  if(t && $("tankKentekenKeuze").value==="dienst") $("tankKenteken").value=t.kenteken||"";
   if(t){
     ["chauffeur","opdrachtgever","kenteken","oplegger","kmStart","dienstDatum"].forEach(id=>{const map={chauffeur:"chauffeur",opdrachtgever:"opdrachtgever",kenteken:"kenteken",oplegger:"oplegger",kmStart:"kmStart",dienstDatum:"datum"};$(id).value=t[map[id]]||"";});
   }
   renderStops();setConnection();renderOverview();
 }
 function renderOverview(){
+  const tankList=$("tankList");
+  if(tankList){const ts=(db.tankbeurten||[]).slice().reverse();tankList.innerHTML=ts.length?ts.map(x=>`<div class="triprow"><strong>${esc(x.kenteken)} · ${esc(x.brandstof)}</strong><div>${esc(x.liters)} liter · ${esc(x.datumTijd?new Date(x.datumTijd).toLocaleString("nl-NL"):"")}</div><div>${esc([x.straat,x.huisnummer,x.postcode,x.plaats,x.landcode].filter(Boolean).join(", ")||"GPS/adres niet beschikbaar")}</div><div class="muted small">${x.km!==""?`Km-stand: ${esc(x.km)}`:"Km-stand niet ingevuld"}${x.latitude!==""?` · GPS: ${esc(x.latitude)}, ${esc(x.longitude)}`:""}</div></div>`).join(""):'<div class="empty">Nog geen tankbeurten.</div>';}
   $("kpiDiensten").textContent=db.trips.length;
   $("kpiStops").textContent=db.trips.reduce((n,t)=>n+t.stops.length,0);
   $("kpiPallets").textContent=db.trips.reduce((n,t)=>n+t.stops.reduce((m,s)=>m+s.palletregels.length,0),0);
@@ -110,7 +187,8 @@ function renderOverview(){
 }
 $("startDienst").addEventListener("click",startTrip);$("eindDienst").addEventListener("click",endTrip);$("addStop").addEventListener("click",addStop);
 $("saveSettings").addEventListener("click",()=>{settings.endpoint=$("endpoint").value.trim();settings.token=$("syncToken").value.trim();localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings));$("syncMessage").textContent="Instellingen lokaal opgeslagen. Test de koppeling voordat je de app gebruikt.";scheduleSync();});
-$("syncNow").addEventListener("click",syncNow);
+$("syncNow").addEventListener("click",syncNow);$("saveTank").addEventListener("click",saveTank);
+$("tankKentekenKeuze").addEventListener("change",()=>{$("tankAndersWrap").classList.toggle("hidden",$("tankKentekenKeuze").value!=="anders");});
 $("exportJson").addEventListener("click",()=>{const blob=new Blob([JSON.stringify({exportedAt:nowIso(),...db},null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`ritregistratie-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href);});
 function loadSettingsUI(){$("endpoint").value=settings.endpoint||"";$("syncToken").value=settings.token||"";}
 let syncTimer=null;function scheduleSync(){clearTimeout(syncTimer);syncTimer=setTimeout(()=>{if(navigator.onLine)syncNow();},1200);}
@@ -129,11 +207,7 @@ async function syncNow(){
     batch.forEach(e=>{const t=db.trips.find(t=>t.id===e.record.id);if(t)t.syncStatus="gesynchroniseerd";});
     localStorage.setItem(STORE_KEY,JSON.stringify(db));$("syncMessage").textContent=`Gesynchroniseerd: ${batch.length} wijziging(en).`;
     setConnection();renderOverview();if(db.outbox.length)scheduleSync();
-}catch(err){
-  console.error("Synchronisatiefout:", err);
-  $("syncMessage").textContent =
-    "Synchronisatiefout: " + String(err.message || err);
-  setConnection();
+  }catch(err){$("syncMessage").textContent="Synchronisatie niet bevestigd. De gegevens blijven veilig in de wachtrij. Controleer URL, toegangscode en publicatie-instellingen.";setConnection();}
 }
 window.addEventListener("online",()=>{setConnection();syncNow();});window.addEventListener("offline",setConnection);
 if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));}
