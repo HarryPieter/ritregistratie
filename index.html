@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#145da0">
+  <title>Ritregistratie</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="appbar">
+      <span class="menu-mark" aria-hidden="true">☰</span>
+      <div class="brand">Ritregistratie</div>
+      <span class="truck-mark" aria-hidden="true">🚚</span>
+    </div>
+    <div id="dienstStatus" class="status">Geen actieve dienst</div>
+  </header>
+  <main>
+    <section id="startScreen" class="panel">
+      <h1>Nieuwe dienst aanmelden</h1>
+      <label>Chauffeur<input id="chauffeur" autocomplete="name" placeholder="Naam chauffeur"></label>
+      <label>Kenteken<input id="kenteken" autocapitalize="characters" placeholder="Bijv. AB-12-CD"></label>
+      <label>Begin-kilometerstand<input id="kmStart" type="number" inputmode="numeric" min="0" placeholder="Kilometerstand"></label>
+      <div id="kmWaarschuwing" class="notice hidden"></div>
+      <label id="kmUitlegLabel" class="hidden">Toelichting bij lagere kilometerstand<textarea id="kmUitleg" rows="2" placeholder="Leg uit waarom de stand lager is"></textarea></label>
+      <button id="startDienst" class="primary">Dienst starten</button>
+    </section>
+
+    <section id="activeScreen" class="hidden">
+      <div class="panel compact">
+        <div class="row between"><h1>Actieve dienst</h1><span id="dienstDatum" class="muted"></span></div>
+        <div id="dienstSamenvatting" class="small"></div>
+        <div class="row between"><span class="muted">Laatste kilometerstand</span><strong id="laatsteKm">—</strong></div>
+      </div>
+
+      <section class="panel">
+        <h2>Nieuwe stop</h2>
+        <button id="bepaalLocatie" class="primary location-button">📍 &nbsp; Locatie bepalen <small>Legt tijd, postcode en plaats vast</small></button>
+        <div id="locatieStatus" class="notice hidden"></div>
+        <div id="locatieInfo" class="location-box hidden">
+          <div><span>Datum / tijd</span><strong id="locDatum"></strong></div>
+          <div><span>Postcode</span><strong id="locPostcode"></strong></div>
+          <div><span>Plaats</span><strong id="locPlaats"></strong></div>
+          <label>Kilometerstand<input id="stopKm" type="number" min="0" inputmode="numeric" placeholder="Kilometerstand"></label>
+          <div id="stopKmWaarschuwing" class="notice hidden"></div>
+        </div>
+
+        <div id="actieKeuze" class="hidden">
+          <h3>Wat wil je registreren?</h3>
+          <div class="action-grid">
+            <button class="action action-load" data-action="pallets">▤ &nbsp; Laden / Lossen / Retour <small>Pallets registreren</small></button>
+            <button class="action action-return" data-action="retour">↶ &nbsp; Retourpallets afleveren <small>Eerder meegenomen pallets afgeven</small></button>
+            <button class="action action-fuel" data-action="tanken">⛽ &nbsp; Tanken <small>Tankbeurt registreren</small></button>
+          </div>
+        </div>
+
+        <div id="detailsPallets" class="subpanel hidden">
+          <h3>Laden / lossen / retour meenemen</h3>
+          <div id="palletRegels"></div>
+          <button id="regelToevoegen" class="secondary">+ Palletregel toevoegen</button>
+          <div class="two-col">
+            <label>Temperatuur laden (°C)<input id="tempLaden" type="number" step="0.1" inputmode="decimal"></label>
+            <label>Temperatuur lossen (°C)<input id="tempLossen" type="number" step="0.1" inputmode="decimal"></label>
+          </div>
+          <label>Opmerking (optioneel)<textarea id="opmerkingPallet" rows="2"></textarea></label>
+        </div>
+
+        <div id="detailsRetour" class="subpanel hidden">
+          <h3>Retourpallets afleveren</h3>
+          <div id="retourRegels"></div>
+          <button id="retourRegelToevoegen" class="secondary">+ Palletregel toevoegen</button>
+          <label>Oorspronkelijke locatie<select id="retourHerkomst"><option value="">Kies oorspronkelijke stop</option></select></label>
+          <label>Opmerking (optioneel)<textarea id="opmerkingRetour" rows="2"></textarea></label>
+        </div>
+
+        <div id="detailsTanken" class="subpanel hidden">
+          <h3>Tankgegevens</h3>
+          <label>Kenteken<select id="tankKentekenKeuze"><option value="dienst">Kenteken van dienst</option><option value="anders">Ander kenteken</option></select></label>
+          <label id="anderKentekenLabel" class="hidden">Ander kenteken<input id="anderKenteken" autocapitalize="characters"></label>
+          <label>Brandstof<select id="brandstof"><option value="Diesel">Diesel</option><option value="Benzine">Benzine</option></select></label>
+          <label>Aantal liters<input id="liters" type="number" min="0.01" step="0.01" inputmode="decimal"></label>
+          <label>Kilometerstand (optioneel)<input id="tankKm" type="number" min="0" inputmode="numeric"></label>
+          <label>Opmerking (optioneel)<textarea id="opmerkingTank" rows="2"></textarea></label>
+        </div>
+
+        <button id="opslaanStop" class="primary hidden">Opslaan</button>
+        <button id="annuleerActie" class="link-button hidden">✕ &nbsp; Stop annuleren / keuze wissen</button>
+      </section>
+
+      <section class="panel">
+        <h2>Dienst beëindigen</h2>
+        <label>Eindkilometerstand<input id="kmEind" type="number" min="0" inputmode="numeric" placeholder="Kilometerstand"></label>
+        <label>Rusttijd na einde dienst (uren)<input id="rusttijd" type="number" min="0" step="0.25" inputmode="decimal" placeholder="Bijv. 9,5" required></label>
+        <p class="muted small">Voorbeeld: 9,5 uur is 9 uur en 30 minuten.</p>
+        <label>Opmerking (optioneel)<textarea id="opmerkingEinde" rows="2"></textarea></label>
+        <button id="beeindigDienst" class="danger">Dienst beëindigen</button>
+      </section>
+
+      <section class="panel">
+        <h2>Synchronisatie</h2>
+        <p id="syncStatus" class="small">Gegevens worden op dit apparaat bewaard.</p>
+        <button id="syncNu" class="secondary">Nu synchroniseren</button>
+      </section>
+    </section>
+
+    <section id="exportScreen" class="panel">
+      <h2>Rapportage</h2>
+      <div class="two-col">
+        <label>Van datum<input id="exportVan" type="date"></label>
+        <label>Tot en met<input id="exportTot" type="date"></label>
+      </div>
+      <button id="maakRapport" class="secondary">Rapport downloaden (CSV)</button>
+      <p class="muted small">CSV opent in Excel. De gegevens blijven ook beschikbaar in de Google Sheets.</p>
+    </section>
+  </main>
+  <template id="palletTemplate">
+    <div class="pallet-row">
+      <label>Handeling<select class="handeling"><option value="Laden">Laden</option><option value="Lossen">Lossen</option><option value="Retour meegenomen">Retour meenemen</option></select></label>
+      <label>Palletsoort<select class="palletType">
+        <option value="Europallet (EP)">Europallet (EP)</option>
+        <option value="Blokpallet (BP)">Blokpallet (BP)</option>
+        <option value="H1-pallet (H1)">H1-pallet (H1)</option>
+        <option value="CH (ubb)">CH (ubb)</option>
+        <option value="Halve pallet (HP)">Halve pallet (HP)</option>
+        <option value="Anders (A)">Anders (A)</option>
+      </select></label>
+      <label>Aantal<input class="palletAantal" type="number" min="1" step="1" inputmode="numeric" placeholder="Aantal"></label>
+      <button type="button" class="remove-row" aria-label="Verwijder regel">Verwijderen</button>
+    </div>
+  </template>
+  <template id="retourTemplate">
+    <div class="pallet-row retour-row">
+      <label>Palletsoort<select class="palletType">
+        <option value="Europallet (EP)">Europallet (EP)</option>
+        <option value="Blokpallet (BP)">Blokpallet (BP)</option>
+        <option value="H1-pallet (H1)">H1-pallet (H1)</option>
+        <option value="CH (ubb)">CH (ubb)</option>
+        <option value="Halve pallet (HP)">Halve pallet (HP)</option>
+        <option value="Anders (A)">Anders (A)</option>
+      </select></label>
+      <label>Aantal<input class="palletAantal" type="number" min="1" step="1" inputmode="numeric" placeholder="Aantal"></label>
+      <button type="button" class="remove-row" aria-label="Verwijder regel">Verwijderen</button>
+    </div>
+  </template>
+  <script src="app.js"></script>
+</body>
+</html>
