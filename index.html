@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14532d">
+<title>Ritregistratie</title>
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#17211b;background:#f3f6f3}
+*{box-sizing:border-box}body{margin:0}header{background:#14532d;color:#fff;padding:18px 16px 14px;position:sticky;top:0;z-index:5}
+header h1{font-size:1.25rem;margin:0 0 4px}header p{margin:0;font-size:.88rem;opacity:.9}
+main{max-width:760px;margin:auto;padding:14px 12px 96px}.card{background:white;border-radius:14px;padding:16px;margin-bottom:13px;box-shadow:0 1px 4px #0000000d}
+h2{font-size:1.05rem;margin:0 0 13px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.field{margin-bottom:12px}label{display:block;font-size:.85rem;font-weight:650;margin-bottom:5px}
+input,select,textarea{font:inherit;width:100%;min-height:44px;border:1px solid #cbd5ce;border-radius:9px;padding:9px 10px;background:#fff;color:#17211b}
+textarea{min-height:74px;resize:vertical}.btn{font:inherit;font-weight:700;border:0;border-radius:10px;min-height:45px;padding:10px 14px;cursor:pointer;background:#14532d;color:#fff}.btn.secondary{background:#e5eee7;color:#14532d}.btn.danger{background:#fee2e2;color:#991b1b}.btn:disabled{opacity:.45}.actions{display:flex;gap:8px;flex-wrap:wrap}.actions .btn{flex:1}
+nav{position:fixed;bottom:0;left:0;right:0;z-index:6;display:flex;background:#fff;border-top:1px solid #d8e1da;padding:7px max(7px,env(safe-area-inset-left)) calc(7px + env(safe-area-inset-bottom));gap:5px}
+nav button{flex:1;background:transparent;color:#425047;border:0;border-radius:9px;padding:9px 4px;font:inherit;font-size:.78rem;font-weight:700}
+nav button.active{background:#e5eee7;color:#14532d}
+.pill{display:inline-block;border-radius:99px;background:#e5eee7;color:#14532d;padding:4px 9px;font-size:.78rem;font-weight:700}
+.muted{color:#647168;font-size:.88rem}.hidden{display:none!important}.stoprow,.cargo-row,.triprow{border:1px solid #dce5de;border-radius:11px;padding:12px;margin:10px 0}.rowtop{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:9px}
+.notice{padding:10px 12px;border-radius:10px;background:#fff7d6;color:#6b5100;font-size:.86rem;margin-bottom:12px}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px}.kpi{background:#f3f6f3;border-radius:10px;padding:12px}.kpi strong{display:block;font-size:1.3rem}
+.small{font-size:.8rem}.empty{padding:18px;text-align:center;color:#647168}
+@media(min-width:600px){main{padding-top:22px}.kpis{grid-template-columns:repeat(4,1fr)}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Ritregistratie</h1>
+  <p id="connection">Lokale opslag actief</p>
+</header>
+<main>
+  <div id="offlineNotice" class="notice hidden">Je bent offline. Wijzigingen worden op dit toestel bewaard en wachten op synchronisatie.</div>
+
+  <section id="view-dienst">
+    <div class="card">
+      <div class="rowtop"><h2>Dienstgegevens</h2><span id="dienstStatus" class="pill">Geen actieve dienst</span></div>
+      <div class="grid">
+        <div class="field"><label for="chauffeur">Chauffeur</label><input id="chauffeur" autocomplete="name" placeholder="Naam chauffeur"></div>
+        <div class="field"><label for="opdrachtgever">Opdrachtgever</label><input id="opdrachtgever" placeholder="Bedrijfsnaam"></div>
+        <div class="field"><label for="kenteken">Kenteken</label><input id="kenteken" placeholder="Bijv. XX-123-X" autocapitalize="characters"></div>
+        <div class="field"><label for="oplegger">Oplegger</label><input id="oplegger" placeholder="Oplegger (optioneel)"></div>
+        <div class="field"><label for="kmStart">Km-stand begin</label><input id="kmStart" type="number" inputmode="numeric" placeholder="Kilometerstand"></div>
+        <div class="field"><label for="dienstDatum">Datum</label><input id="dienstDatum" type="date"></div>
+      </div>
+      <div class="actions">
+        <button class="btn" id="startDienst">Start dienst</button>
+        <button class="btn secondary" id="eindDienst" disabled>Dienst beëindigen</button>
+      </div>
+      <p class="muted small">Tijden worden op het toestel vastgelegd. Controleer de tijdinstelling van de telefoon.</p>
+    </div>
+    <div class="card">
+      <div class="rowtop"><h2>Stops</h2><button class="btn secondary" id="addStop" disabled>+ Stop</button></div>
+      <div id="stopsList" class="empty">Start eerst een dienst om stops toe te voegen.</div>
+    </div>
+  </section>
+
+  <section id="view-overzicht" class="hidden">
+    <div class="card">
+      <h2>Overzicht op dit toestel</h2>
+      <div class="kpis">
+        <div class="kpi"><span class="muted">Diensten</span><strong id="kpiDiensten">0</strong></div>
+        <div class="kpi"><span class="muted">Stops</span><strong id="kpiStops">0</strong></div>
+        <div class="kpi"><span class="muted">Palletregels</span><strong id="kpiPallets">0</strong></div>
+        <div class="kpi"><span class="muted">Wachten op sync</span><strong id="kpiPending">0</strong></div>
+      </div>
+      <p class="muted">Dit overzicht toont gegevens die lokaal op dit toestel zijn opgeslagen. Centrale gegevens verschijnen pas na configuratie van Google Sheets-synchronisatie.</p>
+    </div>
+    <div class="card"><h2>Palletbalans per type</h2><div id="palletBalance" class="empty">Nog geen palletregels.</div></div>
+    <div class="card"><h2>Opgeslagen diensten</h2><div id="tripsList" class="empty">Nog geen diensten.</div></div>
+    <div class="card">
+      <h2>Gegevens exporteren</h2>
+      <p class="muted">Download de lokale gegevens als JSON-back-up. Deze export is bedoeld als noodkopie, niet als Excel-rapport.</p>
+      <button class="btn secondary" id="exportJson">Download back-up</button>
+    </div>
+  </section>
+
+  <section id="view-instellingen" class="hidden">
+    <div class="card">
+      <h2>Synchronisatie instellen</h2>
+      <p class="muted">Voeg hier de URL van de gepubliceerde Google Apps Script-webapp toe nadat de backend is ingericht.</p>
+      <div class="field"><label for="endpoint">Google Apps Script URL</label><input id="endpoint" type="url" placeholder="https://script.google.com/macros/s/.../exec"></div>
+      <div class="field"><label for="syncToken">Geheime toegangscode</label><input id="syncToken" type="password" autocomplete="off" placeholder="In te stellen in Apps Script"></div>
+      <button class="btn" id="saveSettings">Instellingen opslaan</button>
+      <button class="btn secondary" id="syncNow" style="margin-top:8px;width:100%">Synchronisatie proberen</button>
+      <p id="syncMessage" class="muted small">Synchronisatie is nog niet geconfigureerd.</p>
+    </div>
+    <div class="card">
+      <h2>Belangrijke informatie</h2>
+      <p class="muted">De offline invoer werkt op dit toestel nadat de appbestanden eenmaal geladen zijn. Automatische synchronisatie naar Google Sheets werkt pas nadat de Apps Script-backend is geïnstalleerd, gepubliceerd en getest.</p>
+      <p class="muted">Bewaar de telefoon en de Google-accountgegevens veilig. Verwijder browsergegevens niet zolang er niet-gesynchroniseerde ritten zijn.</p>
+    </div>
+  </section>
+</main>
+<nav>
+  <button class="active" data-view="dienst">Dienst</button>
+  <button data-view="overzicht">Overzicht</button>
+  <button data-view="instellingen">Instellingen</button>
+</nav>
+<template id="stopTemplate">
+  <div class="stoprow">
+    <div class="rowtop"><strong class="stopTitle">Stop</strong><button class="btn danger deleteStop" type="button">Verwijderen</button></div>
+    <div class="grid">
+      <div class="field"><label>Plaats / klant</label><input data-field="plaats" placeholder="Naam klant of plaats"></div>
+      <div class="field"><label>Kilometerstand</label><input data-field="km" type="number" inputmode="numeric" placeholder="Km-stand"></div>
+      <div class="field"><label>Aankomsttijd (A.T.)</label><input data-field="aankomst" readonly placeholder="Druk op Aankomst"></div>
+      <div class="field"><label>Vertrektijd (V.T.)</label><input data-field="vertrek" readonly placeholder="Druk op Vertrek"></div>
+      <div class="field"><label>Laadtemperatuur (°C)</label><input data-field="tempLaden" type="number" step="0.1" placeholder="°C"></div>
+      <div class="field"><label>Lostemperatuur (°C)</label><input data-field="tempLossen" type="number" step="0.1" placeholder="°C"></div>
+    </div>
+    <div class="actions">
+      <button class="btn secondary markArrival" type="button">Aankomst</button>
+      <button class="btn secondary markDeparture" type="button" disabled>Vertrek</button>
+    </div>
+    <div class="rowtop" style="margin-top:14px"><strong>Palletbewegingen</strong><button class="btn secondary addCargo" type="button">+ Regel</button></div>
+    <div class="cargoList"></div>
+    <div class="field"><label>Opmerkingen / wachttijd / reden</label><textarea data-field="opmerking" placeholder="Eventuele toelichting"></textarea></div>
+  </div>
+</template>
+<template id="cargoTemplate">
+  <div class="cargo-row">
+    <div class="grid">
+      <div class="field"><label>Handeling</label><select data-cargo="handeling"><option value="Gelost">Gelost</option><option value="Geladen">Geladen</option></select></div>
+      <div class="field"><label>Pallettype</label><select data-cargo="type"><option>Europallet</option><option>H1</option><option>Chubb</option><option>Overige</option></select></div>
+      <div class="field"><label>Aantal</label><input data-cargo="aantal" type="number" min="0" step="1" inputmode="numeric" placeholder="Aantal"></div>
+      <div class="field otherType hidden"><label>Omschrijving overige</label><input data-cargo="omschrijving" placeholder="Ander type"></div>
+    </div>
+    <button class="btn danger removeCargo" type="button">Regel verwijderen</button>
+  </div>
+</template>
+<script src="app.js"></script>
+</body>
+</html>
