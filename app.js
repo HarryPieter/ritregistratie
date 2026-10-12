@@ -1,6 +1,6 @@
 /* Ritregistratie - nieuwe zelfstandige versie */
-const API_URL = "VUL_HIER_DE_URL_VAN_DE_APPS_SCRIPT_WEBAPP_IN";
-const ACCESS_TOKEN = "VUL_HIER_DEZELFDE_TOEGANGSCODE_IN_ALS_IN_CODE_GS";
+const API_URL = "https://script.google.com/macros/s/AKfycbxvIISz6O5AtDzzjVT8pRdyHJQy7iMmM876l1BCX1M4BmDsJMhcPcLWFj8jAhARcTkO/exec";
+const ACCESS_TOKEN = "Meine2025";
 const STORAGE_KEY = "ritregistratie_v2";
 const $ = id => document.getElementById(id);
 const nowISO = () => new Date().toISOString();
