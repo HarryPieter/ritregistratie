@@ -1,0 +1,9 @@
+{
+  "name": "Ritregistratie",
+  "short_name": "Ritregistratie",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f2f6fa",
+  "theme_color": "#145da0",
+  "icons": []
+}
